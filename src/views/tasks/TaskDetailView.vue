@@ -526,7 +526,12 @@
       </div>
     </div>
 
-    <!-- Outros modais (edição, alteração de responsável, etc.) seriam implementados de forma similar -->
+    <EditTaskModal
+      v-if="showEditModal && task"
+      :task="task"
+      @close="showEditModal = false"
+      @updated="fetchTask"
+    />
   </div>
 </template>
 
@@ -537,7 +542,9 @@ import { format, formatDistance, isPast, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/supabase";
 import { useAuthStore } from "@/stores/auth";
+import { useTasksStore } from "@/stores/tasks";
 import type { Database } from "@/types/supabase";
+import EditTaskModal from "@/components/tasks/EditTaskModal.vue";
 
 /* =======================
    TYPES
@@ -571,6 +578,7 @@ type Member = {
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const tasksStore = useTasksStore();
 const taskId = route.params.id as string;
 
 /* =======================
@@ -836,6 +844,52 @@ async function fetchMembers() {
   } finally {
     membersLoading.value = false;
   }
+}
+
+async function removeMember(memberId: string) {
+  if (!confirm("Tem certeza que deseja remover este membro?")) return;
+
+  await supabase.from("task_members").delete().eq("id", memberId);
+  members.value = members.value.filter((m) => m.id !== memberId);
+  window.notify.success("Membro removido");
+}
+
+/* =======================
+   TASK ACTIONS
+======================= */
+
+async function markAsCompleted() {
+  const result = await tasksStore.updateTask(taskId, {
+    status: "concluída",
+  });
+
+  if (result.success) {
+    await fetchTask();
+  }
+}
+
+async function reopenTask() {
+  const result = await tasksStore.updateTask(taskId, {
+    status: "pendente",
+  });
+
+  if (result.success) {
+    await fetchTask();
+  }
+}
+
+async function confirmDelete() {
+  if (
+    !confirm(
+      "Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita."
+    )
+  ) {
+    return;
+  }
+
+  await tasksStore.deleteTask(taskId);
+  window.notify.success("Tarefa excluída com sucesso");
+  router.push("/tasks");
 }
 
 /* =======================

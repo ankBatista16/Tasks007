@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import { supabase } from '@/supabase';
 import type { Task, Comment, Attachment } from '@/types';
 import { useAuthStore } from './auth';
-import { toast } from 'vue-sonner';
 
 function isValidUUID(value?: string) {
   return typeof value === 'string' && value.length === 36;
@@ -75,7 +74,9 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch (err: any) {
       console.error('Erro ao buscar tarefas:', err);
       error.value = err.message;
-      toast.error('Erro ao carregar tarefas');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao carregar tarefas');
+      }
     } finally {
       loading.value = false;
     }
@@ -117,7 +118,9 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch (err: any) {
       console.error('Erro ao buscar tarefa:', err);
       error.value = err.message;
-      toast.error('Erro ao carregar tarefa');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao carregar tarefa');
+      }
       return null;
     } finally {
       loading.value = false;
@@ -138,7 +141,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
     if (err) {
       console.error(err);
-      toast.error('Erro ao carregar comentários');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao carregar comentários');
+      }
       return;
     }
 
@@ -162,10 +167,14 @@ export const useTasksStore = defineStore('tasks', () => {
       if (err) throw err;
 
       comments.value.push(data);
-      toast.success('Comentário adicionado!');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.success('Comentário adicionado');
+      }
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao adicionar comentário');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao adicionar comentário');
+      }
     }
   }
 
@@ -178,7 +187,9 @@ export const useTasksStore = defineStore('tasks', () => {
       .eq('id', id);
 
     if (err) {
-      toast.error('Erro ao excluir comentário');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao excluir comentário');
+      }
       return;
     }
 
@@ -199,7 +210,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
     if (err) {
       console.error(err);
-      toast.error('Erro ao carregar anexos');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao carregar anexos');
+      }
       return;
     }
 
@@ -213,7 +226,47 @@ export const useTasksStore = defineStore('tasks', () => {
     await supabase.from('attachments').delete().eq('id', id);
 
     attachments.value = attachments.value.filter(a => a.id !== id);
-    toast.success('Anexo removido!');
+    if (typeof window !== 'undefined' && window.notify) {
+      window.notify.success('Anexo removido');
+    }
+  }
+
+  /* ----------------------------------------
+   * UPDATE TASK
+   * ------------------------------------- */
+  async function updateTask(id: string, updates: Partial<Task>) {
+    if (!isValidUUID(id)) return { success: false };
+
+    try {
+      const { data, error: err } = await supabase
+        .from('tasks')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (err) throw err;
+
+      const index = tasks.value.findIndex(t => t.id === id);
+      if (index !== -1) {
+        tasks.value[index] = { ...tasks.value[index], ...data };
+      }
+
+      if (currentTask.value?.id === id) {
+        currentTask.value = { ...currentTask.value, ...data };
+      }
+
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.success('Tarefa atualizada');
+      }
+      return { success: true };
+    } catch (err) {
+      console.error(err);
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao atualizar tarefa');
+      }
+      return { success: false };
+    }
   }
 
   /* ----------------------------------------
@@ -228,14 +281,18 @@ export const useTasksStore = defineStore('tasks', () => {
       .eq('id', id);
 
     if (err) {
-      toast.error('Erro ao excluir tarefa');
+      if (typeof window !== 'undefined' && window.notify) {
+        window.notify.error('Erro ao excluir tarefa');
+      }
       return;
     }
 
     tasks.value = tasks.value.filter(t => t.id !== id);
     if (currentTask.value?.id === id) currentTask.value = null;
 
-    toast.success('Tarefa excluída!');
+    if (typeof window !== 'undefined' && window.notify) {
+      window.notify.success('Tarefa excluída');
+    }
   }
 
   /* ----------------------------------------
@@ -263,8 +320,8 @@ export const useTasksStore = defineStore('tasks', () => {
     fetchTaskById,
     addComment,
     deleteComment,
-    uploadAttachment,
     deleteAttachment,
+    updateTask,
     deleteTask,
     reset
   };
